@@ -1,0 +1,13 @@
+# Secrets : ne JAMAIS les envoyer sur GitHub
+.env
+*.pem
+*.key
+ansible/.vault_pass
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Données locales
+rag/.chroma/

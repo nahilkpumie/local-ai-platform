@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  secrets-scan:
+    name: Recherche de secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint:
+    name: Validation des fichiers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Valider docker-compose.yml
+        run: |
+          cp .env.example .env
+          docker compose config -q
+      - name: Valider le YAML
+        run: |
+          pip install yamllint
+          yamllint -d "{extends: relaxed, ignore: ansible/group_vars/}" .
+      - name: Valider les scripts shell
+        run: shellcheck scripts/*.sh
+      - name: Valider le Python
+        run: python3 -m compileall -q .

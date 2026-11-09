@@ -1,0 +1,17 @@
+== Création d'une clé de test : 1 seul modèle local, 2 requêtes/minute max
+Clé créée : sk-iMU64aB...
+
+== Test 1 : modèle non autorisé (gemini-flash) -> attendu : 403 (refusé)
+Code HTTP : 403
+
+== Test 2 : 4 requêtes rapides sur local-llama -> attendu : 200, 200, puis 429
+Requête 1 : 200
+Requête 2 : 200
+Requête 3 : 429
+Requête 4 : 429
+
+== Test 3 : dépenses et usage de la clé
+alias: demo-quota | dépensé: 0.0 | budget max: 1.0 | rpm: 2
+
+== Nettoyage : suppression de la clé de test
+Clé supprimée

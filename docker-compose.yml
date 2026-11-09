@@ -25,6 +25,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_started
     ports:
       - "4000:4000"
     environment:
@@ -37,6 +39,14 @@ services:
       - ./litellm/config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     networks: [backend, frontend]
+
+  ollama:
+    image: ollama/ollama:${OLLAMA_TAG:-latest}
+    container_name: lap-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks: [backend]
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:${OPENWEBUI_TAG:-main}
@@ -61,3 +71,4 @@ networks:
 volumes:
   postgres_data:
   openwebui_data:
+  ollama_data:

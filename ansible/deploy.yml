@@ -1,0 +1,84 @@
+---
+- name: Déployer la plateforme IA locale (LiteLLM + Open WebUI + Ollama)
+  hosts: ai_servers
+  become: true
+  vars:
+    repo_url: "https://github.com/{{ github_user }}/local-ai-platform.git"
+    app_dir: /opt/local-ai-platform
+    ollama_models: [llama3.2:1b, nomic-embed-text]
+    webui_models: [gemini-flash, gemini-flash-lite, local-llama]
+
+  tasks:
+    - name: Installer Docker, Compose et Git
+      ansible.builtin.apt:
+        name: [docker.io, docker-compose-v2, git, python3-yaml]
+        state: present
+        update_cache: true
+
+    - name: Démarrer Docker au boot
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Cloner le dépôt GitHub
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: main
+
+    - name: Générer le fichier .env à partir du coffre Ansible Vault
+      ansible.builtin.template:
+        src: templates/env.j2
+        dest: "{{ app_dir }}/.env"
+        mode: "0600"
+      no_log: true
+
+    - name: Démarrer PostgreSQL, Ollama et LiteLLM
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        services: [postgres, ollama, litellm]
+        state: present
+
+    - name: Télécharger les modèles Ollama
+      ansible.builtin.command: docker exec lap-ollama ollama pull {{ item }}
+      loop: "{{ ollama_models }}"
+      changed_when: false   # ollama pull est sans effet si le modèle est déjà présent
+
+    - name: Attendre que LiteLLM réponde
+      ansible.builtin.uri:
+        url: http://localhost:4000/health/liveliness
+      register: health
+      until: health.status == 200
+      retries: 30
+      delay: 5
+
+    - name: Créer la clé virtuelle d'Open WebUI (ignorée si elle existe déjà)
+      ansible.builtin.uri:
+        url: http://localhost:4000/key/generate
+        method: POST
+        headers:
+          Authorization: "Bearer {{ vault_litellm_master_key }}"
+        body_format: json
+        body:
+          key: "{{ vault_webui_litellm_key }}"
+          key_alias: open-webui
+          models: "{{ webui_models }}"
+          max_budget: 5
+          budget_duration: 30d
+          rpm_limit: 30
+        status_code: [200, 400]
+      no_log: true
+
+    - name: Démarrer toute la plateforme
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: present
+
+    - name: Vérifier qu'Open WebUI répond
+      ansible.builtin.uri:
+        url: http://localhost:3000
+      register: webui
+      until: webui.status == 200
+      retries: 30
+      delay: 5
